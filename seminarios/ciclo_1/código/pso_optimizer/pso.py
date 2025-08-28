@@ -258,7 +258,7 @@ class PSOOptimizer:
         # Define hyperparameter space based on the estimator
         if self.estimator == "KNN":
             hyperparameter_space = {
-                "k": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                "k": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
                 "distance_metric": [0, 1, 2, 3, 4, 5],
                 "weighting_method": [0, 1],
                 "algorithm": [0, 1, 2, 3],
