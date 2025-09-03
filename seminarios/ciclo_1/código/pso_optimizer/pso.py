@@ -35,44 +35,28 @@ class PSOOptimizer:
         print("\n*** Default Values for PSO Optimization ***")
         print(f"The default value for c1 and c2 is 2.05, and for w is 0.72894 according to the paper 'The Particle Swarm — Explosion, Stability, and Convergence in a Multidimensional Complex Space' by Clerc and Kennedy.\n")
 
-    def pso_hyperparameter_optimization(self, X_train, X_test, y_train, y_test, num_particles, num_iterations, c1 = 2.05, c2 = 2.05, num_jobs=-1, w=0.72984):
-        """
-        Perform hyperparameter optimization using Particle Swarm Optimization (PSO).
-
-        Parameters:
-            - estimator: The estimator object (e.g., KNeighborsClassifier).
-            - data: The dataset.
-            - target_column_index: Index of the target column in the dataset.
-            - num_particles: Number of particles in the population.
-            - num_iterations: Number of iterations for the PSO algorithm.
-            - c1: Acceleration constant. Default value is c1 = 2.05
-            - c2: Acceleration constant. Default value is c2 = 2.05
-            - num_jobs: Number of parallel jobs for fitness evaluation.
-            - inertia weight: Inertia constant. Default value is w=0.72984 according to the paper by M. Clerc and J. Kennedy
-
-        Returns:
-            - global_best_position: The best set of hyperparameters found.
-            - global_best_fitness: The best accuracy found.
-        """
+    def pso_hyperparameter_optimization(self, X_train, X_test, y_train, y_test,
+                                    num_particles, num_iterations, 
+                                    c1=2.05, c2=2.05, num_jobs=-1, w=0.72984):
+    
         if self.random_seed is not None:
             np.random.seed(self.random_seed)
+        
         hyperparameter_space = self._get_hyperparameter_space()
-
         progress_bar = tqdm(total=num_iterations, desc="PSO Progress")
 
-        # Initialize the population of particles
-        population = []
-        for _ in range(num_particles):
-            hyperparameters = [np.random.choice(hyperparameter_space[param]) for param in hyperparameter_space]
-            population.append(hyperparameters)
-
-        # Initialize velocity and best position
+        # Inicializa população e velocidade
+        population = [[np.random.choice(hyperparameter_space[param]) for param in hyperparameter_space] for _ in range(num_particles)]
         velocity = [[0] * len(hyperparameter_space) for _ in range(num_particles)]
         best_position = population.copy()
         global_best_fitness = -float("inf")
         global_best_position = []
 
-        # PSO optimization loop
+        # Histórico
+        gbest_history = []
+        positions_history = []  # <-- salva todas as posições
+
+        # Loop de otimização
         for _ in range(num_iterations):
             fitness = Parallel(n_jobs=num_jobs)(
                 delayed(self.evaluate_fitness)(X_train, X_test, y_train, y_test, particle)
@@ -83,31 +67,32 @@ class PSOOptimizer:
                 if fitness[j] > self.evaluate_fitness(X_train, X_test, y_train, y_test, best_position[j]):
                     best_position[j] = particle
 
+            # Atualiza melhor global
             if max(fitness) > global_best_fitness:
                 global_best_fitness = max(fitness)
                 global_best_position = population[fitness.index(max(fitness))]
 
-            for j, particle in enumerate(population):
-                r1 = np.random.uniform(0, 1)
-                r2 = np.random.uniform(0, 1)
-                velocity[j] = [w * velocity[j][k] + c1 * r1 * (best_position[j][k] - particle[k]) + c2 * r2 * (global_best_position[k] - particle[k]) for k in range(len(hyperparameter_space))]
+            # Salva no histórico
+            gbest_history.append(global_best_fitness)
+            positions_history.append([p.copy() for p in population])  # <-- salva snapshot das partículas
 
+            # Atualiza velocidades e posições
+            for j, particle in enumerate(population):
+                r1, r2 = np.random.uniform(0, 1), np.random.uniform(0, 1)
+                velocity[j] = [w * velocity[j][k] + c1 * r1 * (best_position[j][k] - particle[k]) + 
+                            c2 * r2 * (global_best_position[k] - particle[k])
+                            for k in range(len(hyperparameter_space))]
                 for k in range(len(hyperparameter_space)):
                     particle[k] += velocity[j][k]
-                    # particle[k] = max(min(particle[k], max(hyperparameter_space[param])), min(hyperparameter_space[param]))
                     particle[k] = max(min(particle[k], max(hyperparameter_space[list(hyperparameter_space.keys())[k]])), 
-                        min(hyperparameter_space[list(hyperparameter_space.keys())[k]]))
-        
+                                    min(hyperparameter_space[list(hyperparameter_space.keys())[k]]))
 
-            # Update progress bar
             progress_bar.update(1)
 
-            # w = self.update_inertia_weight(w=w)
-
-        # Close progress bar
         progress_bar.close()
 
-        return global_best_position, global_best_fitness
+        # Retorna histórico também
+        return global_best_position, global_best_fitness, gbest_history, positions_history
 
     # def update_inertia_weight(self, w):
 
