@@ -1,5 +1,0 @@
-{
-    "python.analysis.extraPaths": [
-        "./seminarios/ciclo_1/código/pso_optimizer"
-    ]
-}
